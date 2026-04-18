@@ -1,6 +1,6 @@
 # Music Downloader Agent Skill
 
-Cross-platform music downloader agent skill for complex catalog queries.
+Music downloader agent skill for complex catalog queries.
 
 It is built for requests such as:
 - "Download all songs where Method Man is featured between 1995 and 2004."
