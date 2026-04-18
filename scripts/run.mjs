@@ -3,8 +3,8 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const skillRoot = __dirname;
-const scriptRoot = path.join(skillRoot, "scripts");
+const scriptRoot = __dirname;
+const skillRoot = path.resolve(scriptRoot, "..");
 const tsxPath = path.join(scriptRoot, "node_modules", "tsx", "dist", "cli.mjs");
 const cliPath = path.join(scriptRoot, "src", "cli.ts");
 const args = process.argv.slice(2);

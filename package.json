@@ -3,8 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "use": "npm --prefix ./scripts install && node ./run.mjs doctor",
-    "doctor": "node ./run.mjs doctor",
+    "use": "npm --prefix ./scripts install && node ./scripts/run.mjs doctor",
+    "doctor": "node ./scripts/run.mjs doctor",
     "build": "npm --prefix ./scripts run build"
   }
 }

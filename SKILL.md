@@ -23,7 +23,7 @@ Preview:
 ```sh
 cd /path/to/music-downloader
 npm run use
-node ./run.mjs preview --artist-url "https://genius.com/artists/Trackmasters/songs" --count 30 --output-dir "output/trackmasters-first-30"
+node ./scripts/run.mjs preview --artist-url "https://genius.com/artists/Trackmasters/songs" --count 30 --output-dir "output/trackmasters-first-30"
 ```
 
 Download:
@@ -31,7 +31,7 @@ Download:
 ```sh
 cd /path/to/music-downloader
 npm run use
-node ./run.mjs download --artist-url "https://genius.com/artists/Method-man/songs" --feature-of "Method Man" --year-from 1994 --year-to 2006 --output-dir "output/method-man-features-1994-2006"
+node ./scripts/run.mjs download --artist-url "https://genius.com/artists/Method-man/songs" --feature-of "Method Man" --year-from 1994 --year-to 2006 --output-dir "output/method-man-features-1994-2006"
 ```
 
 Cookies:
@@ -39,7 +39,7 @@ Cookies:
 ```sh
 cd /path/to/music-downloader
 npm run use
-node ./run.mjs download --artist-url "https://genius.com/artists/Trackmasters/songs" --cookies-from-browser "chrome" --output-dir "output/trackmasters-cookies"
+node ./scripts/run.mjs download --artist-url "https://genius.com/artists/Trackmasters/songs" --cookies-from-browser "chrome" --output-dir "output/trackmasters-cookies"
 ```
 
 ## Main Filters
@@ -55,6 +55,6 @@ If Genius metadata or YouTube search is not enough, use web research to resolve 
 
 Relative paths are resolved from the skill root, so `output/...` and runtime files always stay inside the skill folder.
 
-Use `node ./run.mjs ...` as the entry command. Do not rely on shell-specific syntax or cwd-specific paths.
+Use `node ./scripts/run.mjs ...` as the entry command. Do not rely on shell-specific syntax or cwd-specific paths.
 
 Entrypoint: [scripts/src/cli.ts](./scripts/src/cli.ts)
