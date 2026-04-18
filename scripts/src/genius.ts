@@ -1,5 +1,3 @@
-import * as cheerio from "cheerio";
-import { fetch } from "undici";
 import { z } from "zod";
 
 import { featuredArtistNames, includesAny, includesNone, normalizeText, primaryArtistName, songText, titleFromSlug } from "./text.js";
@@ -9,16 +7,42 @@ const GENIUS_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0 Safari/537.36";
 const GENIUS_HEADERS = { "user-agent": GENIUS_USER_AGENT };
 const GENIUS_API_HEADERS = { ...GENIUS_HEADERS, "x-requested-with": "XMLHttpRequest" };
-const ARTIST_ID_PATTERNS = [
-  /"artistDiscography":\{"[^"]*".*?"artist":(\d+)/,
-  /rawData\s*=\s*JSON\.parse\('\{\\?"artist_id\\?":(\d+)/,
-  /\\"artist_id\\":(\d+),\\"artist_in_top_10\\"/,
-  /"artist_id":(\d+)/
-] as const;
 
 const songsResponseSchema = z.object({
   response: z.object({
-    songs: z.array(z.record(z.string(), z.unknown()))
+    songs: z.array(z.record(z.string(), z.unknown())),
+    next_page: z.number().nullable().optional()
+  })
+});
+
+const artistResponseSchema = z.object({
+  response: z.object({
+    artist: z.object({
+      id: z.number(),
+      name: z.string(),
+      slug: z.string().optional(),
+      url: z.string().optional()
+    })
+  })
+});
+
+const artistSearchResponseSchema = z.object({
+  response: z.object({
+    sections: z.array(
+      z.object({
+        type: z.string(),
+        hits: z.array(
+          z.object({
+            result: z.object({
+              id: z.number(),
+              name: z.string(),
+              slug: z.string().optional(),
+              url: z.string().optional()
+            })
+          })
+        )
+      })
+    )
   })
 });
 
@@ -26,65 +50,117 @@ function lowerNames(values: string[]): string[] {
   return values.map((value) => normalizeText(value).toLowerCase());
 }
 
-async function fetchText(url: string): Promise<string> {
-  const response = await fetch(url, { headers: GENIUS_HEADERS });
+async function fetchJson<T>(url: string, schema: z.ZodSchema<T>): Promise<T> {
+  const response = await fetch(url, { headers: GENIUS_API_HEADERS });
   if (!response.ok) {
     throw new Error(`Request failed for ${url}: ${response.status}`);
   }
-  return response.text();
+  return schema.parse(await response.json());
+}
+
+function normalizeArtistUrl(artistUrl: string): { slug: string; songsUrl: string } {
+  const parsed = new URL(artistUrl);
+  const host = parsed.hostname.replace(/^www\./, "");
+
+  if (host !== "genius.com") {
+    throw new Error(`Unsupported artist host: ${parsed.hostname}`);
+  }
+
+  const segments = parsed.pathname.split("/").filter(Boolean);
+  if (segments[0] !== "artists" || segments.length < 2) {
+    throw new Error("Artist URL must look like https://genius.com/artists/<slug> or /artists/<slug>/songs.");
+  }
+
+  const slug = segments[1];
+  return {
+    slug,
+    songsUrl: `https://genius.com/artists/${slug}/songs`
+  };
+}
+
+function artistQueryFromSlug(slug: string): string {
+  return titleFromSlug(decodeURIComponent(slug));
+}
+
+async function fetchArtistById(artistId: number, songsUrl?: string): Promise<ResolvedArtist> {
+  const payload = await fetchJson(`https://genius.com/api/artists/${artistId}`, artistResponseSchema);
+  const artist = payload.response.artist;
+
+  return {
+    artistId: artist.id,
+    artistName: artist.name,
+    songsUrl: songsUrl ?? `${artist.url ?? `https://genius.com/artists/${artist.slug ?? `artist-${artist.id}`}`}/songs`
+  };
+}
+
+async function searchArtistBySlug(slug: string, songsUrl: string): Promise<ResolvedArtist> {
+  const query = artistQueryFromSlug(slug);
+  const payload = await fetchJson(
+    `https://genius.com/api/search/artist?q=${encodeURIComponent(query)}`,
+    artistSearchResponseSchema
+  );
+
+  const artistHits = payload.response.sections
+    .filter((section) => section.type === "artist")
+    .flatMap((section) => section.hits.map((hit) => hit.result));
+
+  const normalizedSlug = slug.toLowerCase();
+  const exactSlug = artistHits.find((artist) => artist.slug?.toLowerCase() === normalizedSlug);
+  const exactUrl = artistHits.find((artist) => artist.url?.replace(/\/$/, "") === `https://genius.com/artists/${slug}`);
+  const exactName = artistHits.find((artist) => normalizeText(artist.name).toLowerCase() === normalizeText(query).toLowerCase());
+  const selected = exactSlug ?? exactUrl ?? exactName ?? artistHits[0];
+
+  if (!selected) {
+    throw new Error(`Could not resolve Genius artist for slug "${slug}".`);
+  }
+
+  return {
+    artistId: selected.id,
+    artistName: selected.name,
+    songsUrl
+  };
 }
 
 export async function resolveArtist(artistUrl?: string, artistId?: number): Promise<ResolvedArtist> {
   if (artistId !== undefined) {
-    const slug = artistUrl?.replace(/\/songs\/?$/, "").split("/").at(-1) ?? `artist-${artistId}`;
-    return {
-      artistId,
-      artistName: titleFromSlug(slug),
-      songsUrl: artistUrl ?? `https://genius.com/artists/${artistId}/songs`
-    };
+    const normalized = artistUrl ? normalizeArtistUrl(artistUrl) : undefined;
+    try {
+      return await fetchArtistById(artistId, normalized?.songsUrl);
+    } catch {
+      const slug = normalized?.slug ?? `artist-${artistId}`;
+      return {
+        artistId,
+        artistName: titleFromSlug(slug),
+        songsUrl: normalized?.songsUrl ?? `https://genius.com/artists/${artistId}/songs`
+      };
+    }
   }
 
   if (!artistUrl) {
     throw new Error("Provide --artist-url or --artist-id.");
   }
 
-  const html = await fetchText(artistUrl);
-  const match = ARTIST_ID_PATTERNS.map((pattern) => html.match(pattern)).find((result) => result?.[1]);
-  if (!match?.[1]) {
-    throw new Error("Could not resolve artist id from Genius page.");
-  }
-
-  const $ = cheerio.load(html);
-  const title = $("title").text().replace(/\s+/g, " ").trim().replace(/\s+Songs$/, "");
-  const songsUrl = html.match(/"songsUrl":"([^"]+)"/)?.[1]?.replaceAll("\\/", "/") ?? artistUrl;
-
-  return {
-    artistId: Number.parseInt(match[1], 10),
-    artistName: title || "Unknown Artist",
-    songsUrl
-  };
+  const normalized = normalizeArtistUrl(artistUrl);
+  return searchArtistBySlug(normalized.slug, normalized.songsUrl);
 }
 
 export async function fetchSongs(artistId: number, maxPages: number): Promise<Song[]> {
   const songs: Song[] = [];
   const seen = new Set<number>();
 
-  for (let page = 1; page <= maxPages; page += 1) {
-    const response = await fetch(`https://genius.com/api/artists/${artistId}/songs?page=${page}&sort=popularity`, {
-      headers: GENIUS_API_HEADERS
-    });
+  for (let page = 1; page <= maxPages; ) {
+    const payload = await fetchJson(
+      `https://genius.com/api/artists/${artistId}/songs?page=${page}&per_page=20&sort=popularity&text_format=html,markdown,preview`,
+      songsResponseSchema
+    );
+    const pageSongs = payload.response.songs as unknown as Song[];
 
-    if (!response.ok) {
-      throw new Error(`Genius songs API failed on page ${page}: ${response.status}`);
-    }
-
-    const payload = songsResponseSchema.parse(await response.json()).response.songs as unknown as Song[];
-    if (payload.length === 0) {
+    if (pageSongs.length === 0) {
       break;
     }
 
     let added = 0;
-    for (const song of payload) {
+    for (const song of pageSongs) {
       if (seen.has(song.id)) {
         continue;
       }
@@ -96,6 +172,12 @@ export async function fetchSongs(artistId: number, maxPages: number): Promise<So
     if (added === 0) {
       break;
     }
+
+    if (!payload.response.next_page) {
+      break;
+    }
+
+    page = payload.response.next_page;
   }
 
   return songs;

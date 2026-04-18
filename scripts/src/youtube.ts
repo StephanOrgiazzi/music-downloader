@@ -13,6 +13,7 @@ const DEFAULT_SEARCH_RESULTS = 8;
 const MIN_MATCH_SCORE = 25;
 const POSITIVE_HINTS = ["official audio", "provided to youtube", "topic"] as const;
 const NEGATIVE_HINTS = ["music video", "lyric video", "lyrics video", "live", "karaoke", "reaction", "cover"] as const;
+const VARIANT_HINTS = ["instrumental", "remix", "edit", "radio", "clean", "acapella", "sped up", "slowed", "nightcore"] as const;
 
 async function ytDlpJson(binaryPath: string, args: string[]): Promise<Json> {
   const { stdout } = await execa(binaryPath, args);
@@ -29,6 +30,15 @@ async function ytDlpJson(binaryPath: string, args: string[]): Promise<Json> {
 
 function countMatches(words: string[], text: string): number {
   return words.filter((word) => text.includes(word)).length;
+}
+
+function containsPhrase(text: string, phrase: string): boolean {
+  return normalizeText(text).toLowerCase().includes(normalizeText(phrase).toLowerCase());
+}
+
+function requestedVariant(song: Song, variant: string): boolean {
+  const requestedText = `${song.artist_names} ${song.title}`;
+  return containsPhrase(requestedText, variant);
 }
 
 function buildQuery(song: Song, template: string): string {
@@ -57,20 +67,29 @@ function scoreCandidate(song: Song, candidate: SearchCandidate): number {
   const titleWords = significantWords(song.title);
   const primaryWords = significantWords(primaryArtistName(song));
   const artistWords = significantWords(song.artist_names);
+  const featuredWords = significantWords(song.featured_artists?.map((artist) => artist.name ?? "").join(" ") ?? "");
   const titleText = normalizeText(candidate.title).toLowerCase();
   const bodyText = [candidate.title, candidate.channel, candidate.uploader, candidate.description].join(" ").toLowerCase();
 
   const titleMatches = countMatches(titleWords, titleText);
   const primaryMatches = countMatches(primaryWords, bodyText);
   const artistMatches = countMatches(artistWords, bodyText);
+  const featuredMatches = countMatches(featuredWords, bodyText);
 
-  let score = titleMatches * 25 + primaryMatches * 12 + artistMatches * 6;
+  let score = titleMatches * 25 + primaryMatches * 12 + artistMatches * 6 + featuredMatches * 10;
   if (titleWords.length > 0 && titleMatches < Math.max(1, titleWords.length - 1)) score -= 100;
   if (primaryWords.length > 0 && primaryMatches === 0) score -= 40;
+  if (containsPhrase(candidate.title, song.title)) score += 25;
+  if (containsPhrase(candidate.title, `${primaryArtistName(song)} ${song.title}`)) score += 20;
   if (candidate.channelIsVerified) score += 10;
   if (POSITIVE_HINTS.some((hint) => bodyText.includes(hint))) score += 18;
   for (const penalty of NEGATIVE_HINTS) {
     if (bodyText.includes(penalty)) score -= 35;
+  }
+  for (const variant of VARIANT_HINTS) {
+    if (bodyText.includes(variant) && !requestedVariant(song, variant)) {
+      score -= 90;
+    }
   }
   if (candidate.viewCount) score += Math.min(10, Math.floor(Math.log10(Math.max(candidate.viewCount, 1))));
 

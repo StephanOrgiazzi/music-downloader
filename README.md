@@ -9,6 +9,8 @@ It is built for requests such as:
 
 The skill installs its runtime locally and keeps downloads, manifests, and temporary binaries inside the project folder.
 
+Genius metadata is resolved through Genius JSON endpoints, not HTML scraping, to keep the runtime lighter and less brittle.
+
 ## Usage
 
 Just prompt your agent what music you want to download
