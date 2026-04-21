@@ -21,7 +21,7 @@ node C:\Users\steph\.codex\skills\music-downloader\scripts\music-downloader.js d
 
 Use the actual skill path on the host OS; the script itself is cross-platform.
 
-Use `preview` first for non-trivial filters. It writes `manifest.json` and `manifest.txt` without downloading audio. Use `download` only after the manifest selection looks correct.
+Use `preview` first for non-trivial filters. It writes `manifest.json` without downloading audio. Use `download` only after the manifest selection looks correct.
 
 ## Filters
 

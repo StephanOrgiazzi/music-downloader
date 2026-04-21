@@ -355,7 +355,6 @@ function serializeSong(index, song) {
 
 function writeManifest(outputDir, entries, artist) {
   fs.mkdirSync(outputDir, { recursive: true });
-  const lines = entries.map(([index, song]) => `${String(index).padStart(3, "0")}. ${normalizeText(song.artist_names)} - ${normalizeText(song.title)}`);
   const payload = {
     artist_id: artist.artistId,
     artist_name: artist.artistName,
@@ -363,7 +362,6 @@ function writeManifest(outputDir, entries, artist) {
     selected: entries.map(([index, song]) => serializeSong(index, song))
   };
   fs.writeFileSync(path.join(outputDir, "manifest.json"), `${JSON.stringify(payload, null, 2)}\n`, "utf8");
-  fs.writeFileSync(path.join(outputDir, "manifest.txt"), `${lines.join("\n")}\n`, "utf8");
 }
 
 function commandVersion(command, versionArgs = ["--version"]) {
