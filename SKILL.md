@@ -7,9 +7,9 @@ description: Collect songs from a Genius artist page, filter the list and downlo
 
 Entrypoint: [scripts/music-downloader.js](./scripts/music-downloader.js)
 
-Run with Node.js 18+. Do not run `npm install`; the script auto-manages `yt-dlp` and `ffmpeg` in `.runtime`.
+Run with Node.js 18+. The script auto-manages `yt-dlp` and `ffmpeg` in `.runtime`.
 
-At any time during the various processes, you can use websearch if you need extra info to help the agent fulfills the user query.
+At any time during the various processes, you can use websearch if you need extra info to help fulfill the user query to the best.
 
 ## Usage
 
