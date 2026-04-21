@@ -1,60 +1,38 @@
 ---
 name: music-downloader
-description: Cross-platform music downloader skill using TypeScript, Genius metadata, yt-dlp, and ffmpeg. Use when Codex needs to fetch songs from a Genius artist page, filter them, and download MP3 files on Windows, macOS, or Linux.
+description: Collect songs from a Genius artist page, filter the list and download MP3 files through auto-managed yt-dlp and ffmpeg binaries
 ---
 
 # Music Downloader
 
-## Setup
+Entrypoint: [scripts/music-downloader.js](./scripts/music-downloader.js)
 
-If `node` or `npm` is missing, install Node.js LTS first with the host package manager, then continue. The skill must work the same way on Windows, macOS, and Linux.
+Run with Node.js 18+. Do not run `npm install`; the script auto-manages `yt-dlp` and `ffmpeg` in `.runtime`.
 
-```sh
-cd /path/to/music-downloader
-npm run use
-```
+At any time during the various processes, you can use websearch if you need extra info to help the agent fulfills the user query.
 
-Run `npm run use` before each preview or download. This installs dependencies into the skill, refreshes `yt-dlp`, and keeps runtime files under the skill folder.
-
-## Commands
-
-Preview:
+## Usage
 
 ```sh
-cd /path/to/music-downloader
-npm run use
-node ./scripts/run.mjs preview --artist-url "https://genius.com/artists/Trackmasters/songs" --count 30 --output-dir "output/trackmasters-first-30"
+node C:\Users\steph\.codex\skills\music-downloader\scripts\music-downloader.js doctor
+node C:\Users\steph\.codex\skills\music-downloader\scripts\music-downloader.js preview --artist-url "https://genius.com/artists/<artist>/songs" --output-dir "<dir>" [filters]
+node C:\Users\steph\.codex\skills\music-downloader\scripts\music-downloader.js download --artist-url "https://genius.com/artists/<artist>/songs" --output-dir "<dir>" [filters]
 ```
 
-Download:
+Use the actual skill path on the host OS; the script itself is cross-platform.
 
-```sh
-cd /path/to/music-downloader
-npm run use
-node ./scripts/run.mjs download --artist-url "https://genius.com/artists/Method-man/songs" --feature-of "Method Man" --year-from 1994 --year-to 2006 --output-dir "output/method-man-features-1994-2006"
-```
+Use `preview` first for non-trivial filters. It writes `manifest.json` and `manifest.txt` without downloading audio. Use `download` only after the manifest selection looks correct.
 
-Cookies:
+## Filters
 
-```sh
-cd /path/to/music-downloader
-npm run use
-node ./scripts/run.mjs download --artist-url "https://genius.com/artists/Trackmasters/songs" --cookies-from-browser "chrome" --output-dir "output/trackmasters-cookies"
-```
+- Source: `--artist-url`, `--artist-id`, `--max-pages`, `--concurrency`.
+- Paging: `--start`, `--count`.
+- Text: `--artist-contains`, `--title-contains`.
+- Features: `--feature-of`, `--featured-artist`, `--exclude-featured-artist`, `--has-features`, `--no-features`.
+- Primary artist: `--primary-artist`, `--exclude-primary-artist`.
+- Years: `--year`, `--year-from`, `--year-to`.
+- Download: `--query-template`, `--cookies-from-browser`, `--cookies-file`, `--manifest-only`.
 
-## Main Filters
+Repeat list filters when needed, for example `--title-contains remix --title-contains edit`.
 
-- `--count`, `--start`
-- `--artist-contains`, `--title-contains`
-- `--feature-of`, `--featured-artist`, `--exclude-featured-artist`
-- `--primary-artist`, `--exclude-primary-artist`
-- `--year`, `--year-from`, `--year-to`
-- `--has-features`, `--no-features`
-
-If Genius metadata or YouTube search is not enough, use web research to resolve gaps before downloading.
-
-Relative paths are resolved from the skill root, so `output/...` and runtime files always stay inside the skill folder.
-
-Use `node ./scripts/run.mjs ...` as the entry command. Do not rely on shell-specific syntax or cwd-specific paths.
-
-Entrypoint: [scripts/src/cli.ts](./scripts/src/cli.ts)
+If Genius metadata or YouTube matching is ambiguous, narrow filters or adjust `--query-template` before downloading.

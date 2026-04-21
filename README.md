@@ -14,7 +14,3 @@ Genius metadata is resolved through Genius JSON endpoints, not HTML scraping, to
 ## Usage
 
 Just prompt your agent what music you want to download
-
-## License
-
-[MIT](./LICENSE)
